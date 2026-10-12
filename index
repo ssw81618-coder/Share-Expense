@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>費用分攤達人 v1.2.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+    }
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-emerald-600 flex items-center justify-center text-white shadow-sm font-bold text-lg">
+          🧮
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">費用分攤達人</h1>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">v1.2.0</span>
+          </div>
+          <p class="text-xs text-slate-500">平攤・比例・品項稅額反推・🀄麻將輸贏檯費・最少轉帳對沖</p>
+        </div>
+      </div>
+
+      <!-- 操作工具列：Undo/Redo 與範例/清空 -->
+      <div class="flex items-center gap-2">
+        <button 
+          id="btn-undo" 
+          type="button" 
+          title="復原上一步 (Ctrl+Z / Cmd+Z)"
+          class="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs">
+          <span>↩️</span>
+          <span class="hidden sm:inline">復原 (Undo)</span>
+        </button>
+        <button 
+          id="btn-redo" 
+          type="button" 
+          title="重做下一步 (Ctrl+Y / Cmd+Y)"
+          class="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs">
+          <span>↪️</span>
+          <span class="hidden sm:inline">重做 (Redo)</span>
+        </button>
+        <div class="h-4 w-px bg-slate-200 mx-1"></div>
+        <button 
+          id="btn-load-demo" 
+          type="button" 
+          class="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition shadow-2xs">
+          載入範例
+        </button>
+        <button 
+          id="btn-reset-all" 
+          type="button" 
+          class="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50/80 text-rose-600 hover:bg-rose-100 transition shadow-2xs">
+          清空全部
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- 左半欄：成員名單管理 + 支出登記表單 -->
+    <div class="lg:col-span-6 space-y-6">
+
+      <!-- 成員管理卡片 (0預設值、無人數限制) -->
+      <section class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-base">👥</span>
+            <h2 class="text-sm font-bold text-slate-900">成員名單 (0人即可起步)</h2>
+          </div>
+          <span id="member-count-badge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">0 人</span>
+        </div>
+
+        <form id="form-add-member" class="flex gap-2 mb-3">
+          <input 
+            type="text" 
+            id="input-member-name" 
+            placeholder="輸入姓名（如：小明、阿美、老李）" 
+            maxlength="20"
+            class="flex-1 px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 focus:bg-white"
+          >
+          <button 
+            type="submit" 
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition shadow-xs shrink-0">
+            新增成員
+          </button>
+        </form>
+
+        <div id="members-list" class="flex flex-wrap gap-2 min-h-[44px] p-2.5 bg-slate-50 rounded-xl border border-dashed border-slate-200 custom-scrollbar items-center">
+          <!-- 成員標籤動態渲染 -->
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">💡 支援快速鍵 Ctrl+Z / Ctrl+Y；所有新增、刪除成員與交易均支援還原與重做。</p>
+      </section>
+
+      <!-- 記帳表單卡片 -->
+      <section class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📝</span>
+            <h2 class="text-sm font-bold text-slate-900">新增一筆消費 / 牌局結算</h2>
+          </div>
+          <span id="current-mode-tag" class="text-[11px] font-semibold text-indigo-600 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200">
+            模式 1：平攤
+          </span>
+        </div>
+
+        <!-- 4 種模式切換按鈕區 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">選擇分攤模式</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button type="button" id="tab-mode-equal" class="py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-700 shadow-xs transition-all">
+              1. 👥 平攤
+            </button>
+            <button type="button" id="tab-mode-percent" class="py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+              2. 📊 百分比
+            </button>
+            <button type="button" id="tab-mode-itemized" class="py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+              3. 🍽️ 指定品項
+            </button>
+            <button type="button" id="tab-mode-mahjong" class="py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+              4. 🀄 麻將結算
+            </button>
+          </div>
+        </div>
+
+        <!-- 一般消費共通欄位 (模式 1, 2, 3 顯示) -->
+        <div id="general-expense-fields" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1" for="expense-title">消費名稱 / 項目抬頭</label>
+            <input 
+              type="text" 
+              id="expense-title" 
+              placeholder="例如：週六晚餐 義式餐廳、租車加油費、包廂下午茶" 
+              class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            >
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1" for="select-payer">誰先代墊付款？</label>
+              <select 
+                id="select-payer" 
+                class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
+                <!-- 動態注入付款人 -->
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1" for="input-total-amount">
+                <span id="label-total-amount">發票含稅總金額 (NT$)</span>
+              </label>
+              <input 
+                type="number" 
+                id="input-total-amount" 
+                placeholder="0" 
+                min="0" 
+                step="any" 
+                class="w-full px-3.5 py-2 text-sm font-semibold text-slate-900 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              >
+            </div>
+          </div>
+
+          <!-- 模式 3 專用：固定稅額輸入與即時稅率反推區塊 -->
+          <div id="tax-reverse-card" class="hidden bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-indigo-900 flex items-center gap-1">
+                <span>🧾</span> 發票固定稅額與稅率反推
+              </span>
+              <span class="text-[11px] text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md font-semibold" id="tax-rate-display">
+                反推稅率: 0.0%
+              </span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1" for="input-fixed-tax">
+                  固定稅額 / 服務費 (NT$)
+                </label>
+                <input 
+                  type="number" 
+                  id="input-fixed-tax" 
+                  placeholder="如發票標示之稅額 150" 
+                  min="0" 
+                  step="any"
+                  class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+              </div>
+              <div class="flex flex-col justify-end">
+                <div class="text-[11px] text-slate-500 p-1.5 bg-white rounded-lg border border-slate-200 flex justify-between items-center">
+                  <span>反推稅前目標總額:</span>
+                  <span id="calculated-pretax-amount" class="font-bold text-slate-800">NT$ 0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="mode-panel-container" class="space-y-3 pt-1">
+          
+          <!-- 模式 1：平攤選取面板 -->
+          <div id="panel-equal" class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-600">
+              <span>勾選參與平攤的成員：</span>
+              <div class="space-x-2">
+                <button type="button" id="btn-equal-all" class="text-indigo-600 hover:underline font-semibold">全選</button>
+                <button type="button" id="btn-equal-none" class="text-slate-400 hover:underline">清空</button>
+              </div>
+            </div>
+            <div id="equal-checkboxes-container" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <!-- 成員核取方塊 -->
+            </div>
+            <div id="equal-per-person-tip" class="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between">
+              <span>每人均攤：</span>
+              <span class="font-semibold text-indigo-700">NT$ 0</span>
+            </div>
+          </div>
+
+          <!-- 模式 2：百分比分配面板 -->
+          <div id="panel-percent" class="hidden space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-600">
+              <span>分配各成員負擔比例 (%)：</span>
+              <span id="percent-sum-badge" class="font-bold text-rose-600">目前總和: 0% / 100%</span>
+            </div>
+            <div id="percent-inputs-container" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+              <!-- 百分比輸入清單 -->
+            </div>
+          </div>
+
+          <!-- 模式 3：指定餐點品項面板 (含切換全選/全清按鈕) -->
+          <div id="panel-itemized" class="hidden space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-700">餐點品項明細 (請填未稅價)</span>
+                <p class="text-[11px] text-slate-400">稅額將依各品項金額比例自動配發分配</p>
+              </div>
+              <button 
+                type="button" 
+                id="btn-add-item-row" 
+                class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition border border-indigo-200 flex items-center gap-1 shadow-2xs">
+                <span>➕</span> 新增品項
+              </button>
+            </div>
+
+            <div id="item-rows-container" class="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+              <!-- 品項卡片動態列表 -->
+            </div>
+
+            <!-- 品項統計校驗與快速同步 -->
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+              <div class="flex justify-between items-center text-slate-600">
+                <span>品項未稅合計：<strong id="items-sum-pretax" class="text-slate-900 font-semibold">NT$ 0</strong></span>
+                <span>稅前目標：<strong id="target-pretax-display" class="text-slate-900 font-semibold">NT$ 0</strong></span>
+              </div>
+              <div class="flex justify-between items-center pt-1 border-t border-slate-200">
+                <span id="itemized-balance-status" class="font-semibold text-rose-600">未稅差額：NT$ 0</span>
+                <button 
+                  type="button" 
+                  id="btn-sync-total-from-items" 
+                  class="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold underline">
+                  以品項合計直接同步為總額
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 模式 4：麻將專用結算面板 (檯費 + 玩家零和輸贏) -->
+          <div id="panel-mahjong" class="hidden space-y-4">
+            <div class="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200/90 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                  <span>🀄</span> 麻將牌局與場地檯費設定
+                </span>
+                <span class="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-md">
+                  零和博弈模式
+                </span>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1" for="mahjong-title">牌局名稱</label>
+                <input 
+                  type="text" 
+                  id="mahjong-title" 
+                  placeholder="例如：週末方城之戰、過年通宵麻將" 
+                  value="週末麻將局" 
+                  class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                >
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-1" for="mahjong-table-fee">
+                    檯費 / 場地包廂費 (NT$)
+                  </label>
+                  <input 
+                    type="number" 
+                    id="mahjong-table-fee" 
+                    placeholder="0 (無檯費可填 0)" 
+                    min="0" 
+                    step="any"
+                    value="0"
+                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  >
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-1" for="mahjong-fee-payer">
+                    誰先代墊/代收檯費？
+                  </label>
+                  <select 
+                    id="mahjong-fee-payer" 
+                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                    <!-- 動態注入付款人 -->
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">檯費分攤方式</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                  <label class="flex items-center gap-1.5 text-xs bg-white p-2 rounded-lg border border-slate-200 cursor-pointer hover:border-amber-400">
+                    <input type="radio" name="mahjong-fee-split" value="equal" checked class="text-amber-600">
+                    <span class="font-medium text-slate-700">參與雀友均攤</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs bg-white p-2 rounded-lg border border-slate-200 cursor-pointer hover:border-amber-400">
+                    <input type="radio" name="mahjong-fee-split" value="winner" class="text-amber-600">
+                    <span class="font-medium text-slate-700">大贏家全包出檯費</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs bg-white p-2 rounded-lg border border-slate-200 cursor-pointer hover:border-amber-400">
+                    <input type="radio" name="mahjong-fee-split" value="none" class="text-amber-600">
+                    <span class="font-medium text-slate-700">不扣檯費 (純算輸贏)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 雀友輸贏金額登記 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-slate-700">各家輸贏登記 (+代表贏錢 / -負號代表輸錢)</span>
+                <span id="mahjong-zero-sum-badge" class="text-xs font-bold text-rose-600">輸贏差額: 0</span>
+              </div>
+              <div id="mahjong-players-container" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                <!-- 雀友輸贏卡片動態渲染 -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 提交按鈕與錯誤提示 -->
+        <div class="pt-2">
+          <div id="form-validation-msg" class="text-xs font-semibold text-rose-600 mb-2 min-h-[18px]"></div>
+          <button 
+            type="button" 
+            id="btn-submit-expense" 
+            class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span>💾</span>
+            <span id="btn-submit-text">確認記錄這筆開銷</span>
+          </button>
+        </div>
+
+      </section>
+    </div>
+
+    <div class="lg:col-span-6 space-y-6">
+
+      <!-- 結算結果卡片 (即時最少轉帳對沖) -->
+      <section class="bg-gradient-to-br from-white to-emerald-50/40 rounded-2xl p-5 border border-emerald-200/80 shadow-xs space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-emerald-100">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🎯</span>
+            <div>
+              <h2 class="text-sm font-bold text-emerald-950">最佳化對沖結算方案</h2>
+              <p class="text-[11px] text-emerald-700">自動抵銷連鎖借貸，以最少轉帳次數完成清算</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            id="btn-copy-line-report" 
+            class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-semibold transition shadow-xs flex items-center gap-1.5">
+            <span>📋</span>
+            <span>複製 LINE 報告</span>
+          </button>
+        </div>
+
+        <!-- 淨額狀態與轉帳指示兩欄排版 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <!-- 個人淨額列表 -->
+          <div class="bg-white/80 backdrop-blur rounded-xl p-3 border border-slate-200/80 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">個人淨額 (+應收 / -應付)</span>
+              <span id="settle-sum-check" class="text-[10px] font-semibold text-slate-400">總和平衡: $0</span>
+            </div>
+            <div id="net-balance-list" class="space-y-1.5 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+              <div class="text-xs text-slate-400 text-center py-4">尚未有任何結算資料</div>
+            </div>
+          </div>
+
+          <!-- 推薦轉帳指示 -->
+          <div class="bg-white/80 backdrop-blur rounded-xl p-3 border border-emerald-200 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">建議轉帳指示</span>
+              <span id="transfer-count-badge" class="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">0 筆轉帳</span>
+            </div>
+            <div id="transfer-routes-list" class="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+              <div class="text-xs text-emerald-600/70 text-center py-4">目前收支平衡，無須轉帳 🎉</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 支出明細記錄清單卡片 -->
+      <section class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📋</span>
+            <h2 class="text-sm font-bold text-slate-900">消費記錄明細</h2>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-500">共 <strong id="record-count" class="text-slate-800">0</strong> 筆</span>
+            <span class="text-slate-300">|</span>
+            <span class="text-slate-500">總金額: <strong id="record-total-amount" class="text-indigo-600 font-bold">NT$ 0</strong></span>
+          </div>
+        </div>
+
+        <div id="expense-records-container" class="space-y-2.5 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+          <!-- 支出項目動態列表 -->
+          <div class="text-center py-12 text-slate-400 text-xs">
+            目前無任何消費記錄，請在左側輸入新增 ✨
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+    費用分攤達人 v1.2.0 &copy; 2026 ・ 單一檔案即開即用 ・ 支援麻將與品項稅額反推
+  </footer>
+
+  <!-- Toast 訊息浮動通知 -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-10 opacity-0 pointer-events-none transition-all duration-200 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+    <span id="toast-icon">✅</span>
+    <span id="toast-text">已複製到剪貼簿</span>
+  </div>
+
+  <script>
+    // --- 應用程式狀態管理 ---
+    const APP_STORAGE_KEY = 'EXPENSE_SPLITTER_V1_2_DATA';
+
+    // 歷史操作記錄 (Undo / Redo 狀態機)
+    const historyStack = [];
+    let historyIndex = -1;
+
+    // 當前應用程式狀態 (預設完全空白 0 成員、0 支出)
+    let appState = {
+      members: [],
+      expenses: []
+    };
+
+    // 表單暫存狀態
+    let currentMode = 'equal'; // 'equal' | 'percent' | 'itemized' | 'mahjong'
+    let itemizedList = [];     // [{ id, name, price, consumers: [] }]
+    let percentShares = {};    // { memberName: percentValue }
+    let mahjongScores = {};    // { memberName: scoreValue }
+
+    // DOM 快取
+    const DOM = {
+      btnUndo: document.getElementById('btn-undo'),
+      btnRedo: document.getElementById('btn-redo'),
+      btnResetAll: document.getElementById('btn-reset-all'),
+      btnLoadDemo: document.getElementById('btn-load-demo'),
+      
+      formAddMember: document.getElementById('form-add-member'),
+      inputMemberName: document.getElementById('input-member-name'),
+      membersList: document.getElementById('members-list'),
+      memberCountBadge: document.getElementById('member-count-badge'),
+
+      currentModeTag: document.getElementById('current-mode-tag'),
+      tabs: {
+        equal: document.getElementById('tab-mode-equal'),
+        percent: document.getElementById('tab-mode-percent'),
+        itemized: document.getElementById('tab-mode-itemized'),
+        mahjong: document.getElementById('tab-mode-mahjong')
+      },
+      panels: {
+        equal: document.getElementById('panel-equal'),
+        percent: document.getElementById('panel-percent'),
+        itemized: document.getElementById('panel-itemized'),
+        mahjong: document.getElementById('panel-mahjong')
+      },
+      generalFields: document.getElementById('general-expense-fields'),
+      expenseTitle: document.getElementById('expense-title'),
+      selectPayer: document.getElementById('select-payer'),
+      inputTotalAmount: document.getElementById('input-total-amount'),
+      labelTotalAmount: document.getElementById('label-total-amount'),
+
+      // 模式 3 稅費相關
+      taxReverseCard: document.getElementById('tax-reverse-card'),
+      inputFixedTax: document.getElementById('input-fixed-tax'),
+      taxRateDisplay: document.getElementById('tax-rate-display'),
+      calculatedPretaxAmount: document.getElementById('calculated-pretax-amount'),
+      btnAddItemRow: document.getElementById('btn-add-item-row'),
+      itemRowsContainer: document.getElementById('item-rows-container'),
+      itemsSumPretax: document.getElementById('items-sum-pretax'),
+      targetPretaxDisplay: document.getElementById('target-pretax-display'),
+      itemizedBalanceStatus: document.getElementById('itemized-balance-status'),
+      btnSyncTotalFromItems: document.getElementById('btn-sync-total-from-items'),
+
+      // 模式 1
+      btnEqualAll: document.getElementById('btn-equal-all'),
+      btnEqualNone: document.getElementById('btn-equal-none'),
+      equalCheckboxesContainer: document.getElementById('equal-checkboxes-container'),
+      equalPerPersonTip: document.getElementById('equal-per-person-tip'),
+
+      // 模式 2
+      percentInputsContainer: document.getElementById('percent-inputs-container'),
+      percentSumBadge: document.getElementById('percent-sum-badge'),
+
+      // 模式 4 麻將
+      mahjongTitle: document.getElementById('mahjong-title'),
+      mahjongTableFee: document.getElementById('mahjong-table-fee'),
+      mahjongFeePayer: document.getElementById('mahjong-fee-payer'),
+      mahjongPlayersContainer: document.getElementById('mahjong-players-container'),
+      mahjongZeroSumBadge: document.getElementById('mahjong-zero-sum-badge'),
+
+      // 提交與校驗
+      formValidationMsg: document.getElementById('form-validation-msg'),
+      btnSubmitExpense: document.getElementById('btn-submit-expense'),
+      btnSubmitText: document.getElementById('btn-submit-text'),
+
+      // 右欄明細與結算
+      netBalanceList: document.getElementById('net-balance-list'),
+      settleSumCheck: document.getElementById('settle-sum-check'),
+      transferRoutesList: document.getElementById('transfer-routes-list'),
+      transferCountBadge: document.getElementById('transfer-count-badge'),
+      expenseRecordsContainer: document.getElementById('expense-records-container'),
+      recordCount: document.getElementById('record-count'),
+      recordTotalAmount: document.getElementById('record-total-amount'),
+      btnCopyLineReport: document.getElementById('btn-copy-line-report'),
+      toast: document.getElementById('toast'),
+      toastText: document.getElementById('toast-text'),
+      toastIcon: document.getElementById('toast-icon')
+    };
+
+    // --- STREAMING_CHUNK:Implementing Undo/Redo state machine and shortcuts ---
+    function recordHistory() {
+      // 若當前歷史指針不在最前端，截斷後續 redo 分支
+      if (historyIndex < historyStack.length - 1) {
+        historyStack.splice(historyIndex + 1);
+      }
+      historyStack.push(JSON.stringify(appState));
+      historyIndex = historyStack.length - 1;
+      updateUndoRedoButtons();
+      saveToLocalStorage();
+    }
+
+    function undo() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        appState = JSON.parse(historyStack[historyIndex]);
+        renderAllViews();
+        updateUndoRedoButtons();
+        saveToLocalStorage();
+        showToast('已復原上一步 (Undo)', '↩️');
+      }
+    }
+
+    function redo() {
+      if (historyIndex < historyStack.length - 1) {
+        historyIndex++;
+        appState = JSON.parse(historyStack[historyIndex]);
+        renderAllViews();
+        updateUndoRedoButtons();
+        saveToLocalStorage();
+        showToast('已重做下一步 (Redo)', '↪️');
+      }
+    }
+
+    function updateUndoRedoButtons() {
+      DOM.btnUndo.disabled = historyIndex <= 0;
+      DOM.btnRedo.disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    function saveToLocalStorage() {
+      try {
+        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        console.warn('無法寫入 LocalStorage', e);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const raw = localStorage.getItem(APP_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.members) && Array.isArray(parsed.expenses)) {
+            appState = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('讀取 LocalStorage 失敗', e);
+      }
+      historyStack.length = 0;
+      historyStack.push(JSON.stringify(appState));
+      historyIndex = 0;
+      updateUndoRedoButtons();
+    }
+
+    // --- STREAMING_CHUNK:Handling members CRUD operations ---
+    function addMember(name) {
+      const cleanName = name.trim();
+      if (!cleanName) return;
+      if (appState.members.includes(cleanName)) {
+        showToast(`成員「${cleanName}」已存在！`, '⚠️');
+        return;
+      }
+      appState.members.push(cleanName);
+      recordHistory();
+      renderAllViews();
+      DOM.inputMemberName.value = '';
+      showToast(`已新增成員：${cleanName}`, '👤');
+    }
+
+    function removeMember(name) {
+      const isUsed = appState.expenses.some(e => {
+        if (e.payer === name) return true;
+        if (e.splits && e.splits[name] !== undefined) return true;
+        return false;
+      });
+
+      if (isUsed) {
+        const confirmed = window.confirm(`成員「${name}」在現有消費記錄中有參與分攤或代墊，確定要刪除嗎？`);
+        if (!confirmed) return;
+      }
+
+      appState.members = appState.members.filter(m => m !== name);
+      delete percentShares[name];
+      delete mahjongScores[name];
+      itemizedList.forEach(item => {
+        item.consumers = item.consumers.filter(c => c !== name);
+      });
+
+      recordHistory();
+      renderAllViews();
+      showToast(`已移除成員：${name}`, '🗑️');
+    }
+
+    // --- STREAMING_CHUNK:Switching mode tabs and binding event listeners ---
+    function switchMode(mode) {
+      currentMode = mode;
+      const modeNames = {
+        equal: '模式 1：平攤',
+        percent: '模式 2：百分比',
+        itemized: '模式 3：指定品項',
+        mahjong: '模式 4：麻將結算'
+      };
+      DOM.currentModeTag.textContent = modeNames[mode];
+
+      Object.keys(DOM.tabs).forEach(k => {
+        if (k === mode) {
+          DOM.tabs[k].className = "py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-700 shadow-xs transition-all";
+        } else {
+          DOM.tabs[k].className = "py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition-all";
+        }
+      });
+
+      Object.keys(DOM.panels).forEach(k => {
+        DOM.panels[k].classList.toggle('hidden', k !== mode);
+      });
+
+      const isMahjong = mode === 'mahjong';
+      DOM.generalFields.classList.toggle('hidden', isMahjong);
+      DOM.taxReverseCard.classList.toggle('hidden', mode !== 'itemized');
+
+      if (mode === 'itemized' && itemizedList.length === 0) {
+        addItemRow();
+      }
+
+      updateModeFormInputs();
+      validateCurrentForm();
+    }
+
+    // --- STREAMING_CHUNK:Configuring tax reverse calculation and itemized allocation ---
+    function updateTaxReverseCalculation() {
+      const invoiceTotal = parseFloat(DOM.inputTotalAmount.value) || 0;
+      const fixedTax = parseFloat(DOM.inputFixedTax.value) || 0;
+      
+      const pretax = Math.max(0, invoiceTotal - fixedTax);
+      DOM.calculatedPretaxAmount.textContent = `NT$ ${pretax.toLocaleString()}`;
+
+      if (pretax > 0 && fixedTax > 0) {
+        const rate = (fixedTax / pretax) * 100;
+        DOM.taxRateDisplay.textContent = `反推稅率: ${rate.toFixed(1)}%`;
+      } else {
+        DOM.taxRateDisplay.textContent = `反推稅率: 0.0%`;
+      }
+
+      DOM.targetPretaxDisplay.textContent = `NT$ ${pretax.toLocaleString()}`;
+      updateItemizedTotals();
+    }
+
+    function addItemRow(initialData = null) {
+      const newItem = initialData || {
+        id: Date.now() + Math.random(),
+        name: `餐點品項 ${itemizedList.length + 1}`,
+        price: '',
+        consumers: [...appState.members] // 預設全員選取
+      };
+      itemizedList.push(newItem);
+      renderItemizedRows();
+      validateCurrentForm();
+    }
+
+    function removeItemRow(id) {
+      itemizedList = itemizedList.filter(item => item.id !== id);
+      renderItemizedRows();
+      validateCurrentForm();
+    }
+
+    function toggleItemConsumer(itemId, member) {
+      const item = itemizedList.find(i => i.id === itemId);
+      if (!item) return;
+      if (item.consumers.includes(member)) {
+        item.consumers = item.consumers.filter(c => c !== member);
+      } else {
+        item.consumers.push(member);
+      }
+      renderItemizedRows();
+      validateCurrentForm();
+    }
+
+    // 項目專屬：全選 / 全清 雙態切換
+    function toggleItemAllOrNone(itemId) {
+      const item = itemizedList.find(i => i.id === itemId);
+      if (!item) return;
+
+      const allMembers = appState.members;
+      // 若當前有選取任何人，點擊後「全清」；若已清空，點擊後「全選」
+      if (item.consumers.length > 0) {
+        item.consumers = [];
+      } else {
+        item.consumers = [...allMembers];
+      }
+      renderItemizedRows();
+      validateCurrentForm();
+    }
+
+    function renderItemizedRows() {
+      DOM.itemRowsContainer.innerHTML = '';
+
+      if (itemizedList.length === 0) {
+        DOM.itemRowsContainer.innerHTML = `
+          <div class="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl">
+            點擊上方「新增品項」開始輸入品項明細
+          </div>`;
+        updateItemizedTotals();
+        return;
+      }
+
+      itemizedList.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = "p-3 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs";
+
+        const hasAnySelected = item.consumers.length > 0;
+        const toggleBtnText = hasAnySelected ? '全清 ✖' : '全選 ✔';
+        const toggleBtnClass = hasAnySelected 
+          ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 border-rose-200' 
+          : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-200';
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-400 w-5">#${index + 1}</span>
+            <input 
+              type="text" 
+              placeholder="品項名稱 (如：肋眼牛排、提拉米蘇)" 
+              value="${item.name || ''}" 
+              data-id="${item.id}"
+              class="input-item-name flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+            <div class="flex items-center gap-1 w-28">
+              <span class="text-[11px] text-slate-400">NT$</span>
+              <input 
+                type="number" 
+                placeholder="未稅價" 
+                value="${item.price}" 
+                min="0" 
+                step="any"
+                data-id="${item.id}"
+                class="input-item-price w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-right"
+              >
+            </div>
+            <button 
+              type="button" 
+              onclick="removeItemRow(${item.id})"
+              class="text-slate-400 hover:text-rose-500 p-1.5 rounded-md hover:bg-rose-50 transition" 
+              title="刪除此品項">
+              ✕
+            </button>
+          </div>
+
+          <!-- 成員選取區與全選/全清切換 -->
+          <div class="pt-1.5 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+            <span class="text-[11px] text-slate-500">此項由誰承擔：</span>
+            <button 
+              type="button" 
+              onclick="toggleItemAllOrNone(${item.id})" 
+              class="text-[10px] font-bold px-2 py-0.5 rounded-md border transition ${toggleBtnClass}">
+              ${toggleBtnText}
+            </button>
+            <div class="flex flex-wrap gap-1 items-center ml-1">
+              ${appState.members.map(m => {
+                const checked = item.consumers.includes(m);
+                return `
+                  <button 
+                    type="button" 
+                    onclick="toggleItemConsumer(${item.id}, '${m}')"
+                    class="text-[11px] font-medium px-2 py-0.5 rounded-md border transition ${
+                      checked 
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }">
+                    ${m}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        DOM.itemRowsContainer.appendChild(row);
+      });
+
+      DOM.itemRowsContainer.querySelectorAll('.input-item-name').forEach(inp => {
+        inp.addEventListener('input', e => {
+          const id = parseFloat(e.target.dataset.id);
+          const item = itemizedList.find(i => i.id === id);
+          if (item) item.name = e.target.value;
+        });
+      });
+
+      DOM.itemRowsContainer.querySelectorAll('.input-item-price').forEach(inp => {
+        inp.addEventListener('input', e => {
+          const id = parseFloat(e.target.dataset.id);
+          const item = itemizedList.find(i => i.id === id);
+          if (item) {
+            item.price = e.target.value;
+            updateItemizedTotals();
+            validateCurrentForm();
+          }
+        });
+      });
+
+      updateItemizedTotals();
+    }
+
+    function updateItemizedTotals() {
+      const sumPretax = itemizedList.reduce((acc, cur) => acc + (parseFloat(cur.price) || 0), 0);
+      DOM.itemsSumPretax.textContent = `NT$ ${sumPretax.toLocaleString()}`;
+
+      const invoiceTotal = parseFloat(DOM.inputTotalAmount.value) || 0;
+      const fixedTax = parseFloat(DOM.inputFixedTax.value) || 0;
+      const targetPretax = Math.max(0, invoiceTotal - fixedTax);
+
+      const diff = Math.round((targetPretax - sumPretax) * 100) / 100;
+      if (Math.abs(diff) < 0.01) {
+        DOM.itemizedBalanceStatus.textContent = '✅ 品項合計與稅前總額完全相符！';
+        DOM.itemizedBalanceStatus.className = 'font-semibold text-emerald-600';
+      } else {
+        const sign = diff > 0 ? '少於稅前' : '超出稅前';
+        DOM.itemizedBalanceStatus.textContent = `⚠️ 品項合計 ${sign} NT$ ${Math.abs(diff).toLocaleString()}`;
+        DOM.itemizedBalanceStatus.className = 'font-semibold text-rose-600';
+      }
+    }
+
+    function syncTotalFromItems() {
+      const sumPretax = itemizedList.reduce((acc, cur) => acc + (parseFloat(cur.price) || 0), 0);
+      const fixedTax = parseFloat(DOM.inputFixedTax.value) || 0;
+      const calculatedTotal = sumPretax + fixedTax;
+      DOM.inputTotalAmount.value = calculatedTotal;
+      updateTaxReverseCalculation();
+      validateCurrentForm();
+      showToast(`已自動將總金額同步為 NT$ ${calculatedTotal}`, '🔄');
+    }
+
+    // --- STREAMING_CHUNK:Configuring Mahjong mode UI and zero-sum check ---
+    function renderMahjongInputs() {
+      DOM.mahjongPlayersContainer.innerHTML = '';
+
+      if (appState.members.length === 0) {
+        DOM.mahjongPlayersContainer.innerHTML = `
+          <div class="text-center py-4 text-slate-400 text-xs">
+            請先在左上方新增成員名單
+          </div>`;
+        return;
+      }
+
+      appState.members.forEach(m => {
+        const currentScore = mahjongScores[m] !== undefined ? mahjongScores[m] : '';
+        const card = document.createElement('div');
+        card.className = "flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200";
+
+        card.innerHTML = `
+          <span class="text-xs font-bold text-slate-800 w-24 truncate">${m}</span>
+          <div class="flex items-center gap-2 flex-1 justify-end">
+            <span class="text-[11px] text-slate-400">輸贏(NT$):</span>
+            <div class="w-32">
+              <input 
+                type="number" 
+                step="any"
+                placeholder="0 (贏+ / 輸-)"
+                value="${currentScore}"
+                data-member="${m}"
+                class="input-mahjong-score w-full px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 text-right"
+              >
+            </div>
+          </div>
+        `;
+        DOM.mahjongPlayersContainer.appendChild(card);
+      });
+
+      DOM.mahjongPlayersContainer.querySelectorAll('.input-mahjong-score').forEach(inp => {
+        inp.addEventListener('input', e => {
+          const member = e.target.dataset.member;
+          mahjongScores[member] = e.target.value;
+          validateCurrentForm();
+        });
+      });
+    }
+
+    function checkMahjongZeroSum() {
+      let sum = 0;
+      appState.members.forEach(m => {
+        sum += parseFloat(mahjongScores[m]) || 0;
+      });
+
+      const roundedSum = Math.round(sum * 100) / 100;
+      if (Math.abs(roundedSum) < 0.01) {
+        DOM.mahjongZeroSumBadge.textContent = '✅ 輸贏完美平衡 (差額 0)';
+        DOM.mahjongZeroSumBadge.className = 'text-xs font-bold text-emerald-600';
+        return true;
+      } else {
+        const sign = roundedSum > 0 ? '+' : '';
+        DOM.mahjongZeroSumBadge.textContent = `❌ 輸贏差額 ${sign}${roundedSum} (零和合計需為 0)`;
+        DOM.mahjongZeroSumBadge.className = 'text-xs font-bold text-rose-600';
+        return false;
+      }
+    }
+
+    // --- STREAMING_CHUNK:Implementing multi-mode form validations ---
+    function updateModeFormInputs() {
+      if (currentMode === 'equal') {
+        renderEqualCheckboxes();
+      } else if (currentMode === 'percent') {
+        renderPercentInputs();
+      } else if (currentMode === 'itemized') {
+        renderItemizedRows();
+        updateTaxReverseCalculation();
+      } else if (currentMode === 'mahjong') {
+        renderMahjongInputs();
+      }
+    }
+
+    function renderEqualCheckboxes() {
+      DOM.equalCheckboxesContainer.innerHTML = '';
+      if (appState.members.length === 0) {
+        DOM.equalCheckboxesContainer.innerHTML = `<span class="text-xs text-slate-400 col-span-3">尚未新增任何成員</span>`;
+        return;
+      }
+      appState.members.forEach(m => {
+        const label = document.createElement('label');
+        label.className = "flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer text-xs";
+        label.innerHTML = `
+          <input type="checkbox" name="equal-members" value="${m}" checked class="rounded text-indigo-600 focus:ring-0">
+          <span class="font-medium text-slate-700 truncate">${m}</span>
+        `;
+        DOM.equalCheckboxesContainer.appendChild(label);
+      });
+
+      DOM.equalCheckboxesContainer.querySelectorAll('input').forEach(chk => {
+        chk.addEventListener('change', () => validateCurrentForm());
+      });
+    }
+
+    function renderPercentInputs() {
+      DOM.percentInputsContainer.innerHTML = '';
+      if (appState.members.length === 0) {
+        DOM.percentInputsContainer.innerHTML = `<div class="text-xs text-slate-400 py-2">尚未新增任何成員</div>`;
+        return;
+      }
+      appState.members.forEach(m => {
+        const currentVal = percentShares[m] !== undefined ? percentShares[m] : '';
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 bg-slate-50 rounded-xl border border-slate-200";
+        row.innerHTML = `
+          <span class="text-xs font-semibold text-slate-700 w-28 truncate">${m}</span>
+          <div class="flex items-center gap-1 w-24">
+            <input 
+              type="number" 
+              min="0" 
+              max="100" 
+              step="any" 
+              placeholder="0" 
+              value="${currentVal}"
+              data-member="${m}"
+              class="input-percent-share w-full px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-right"
+            >
+            <span class="text-xs text-slate-500">%</span>
+          </div>
+        `;
+        DOM.percentInputsContainer.appendChild(row);
+      });
+
+      DOM.percentInputsContainer.querySelectorAll('.input-percent-share').forEach(inp => {
+        inp.addEventListener('input', e => {
+          const m = e.target.dataset.member;
+          percentShares[m] = e.target.value;
+          validateCurrentForm();
+        });
+      });
+    }
+
+    function validateCurrentForm() {
+      const msg = DOM.formValidationMsg;
+      msg.textContent = '';
+      let isValid = true;
+
+      // 檢查成員數量
+      if (appState.members.length === 0) {
+        msg.textContent = '⚠️ 請先在上方新增至少 1 位成員！';
+        DOM.btnSubmitExpense.disabled = true;
+        return false;
+      }
+
+      // 模式 4：麻將模式檢驗
+      if (currentMode === 'mahjong') {
+        const tableFee = parseFloat(DOM.mahjongTableFee.value) || 0;
+        const payer = DOM.mahjongFeePayer.value;
+
+        if (tableFee > 0 && !payer) {
+          msg.textContent = '⚠️ 請選擇代墊/代收檯費的人！';
+          isValid = false;
+        }
+
+        const isZeroSum = checkMahjongZeroSum();
+        if (!isZeroSum) {
+          msg.textContent = '⚠️ 麻將各家輸贏總和必須為 0 (零和平衡)！';
+          isValid = false;
+        }
+
+        DOM.btnSubmitExpense.disabled = !isValid;
+        return isValid;
+      }
+
+      // 模式 1, 2, 3 通用檢查
+      const totalAmount = parseFloat(DOM.inputTotalAmount.value) || 0;
+      const payer = DOM.selectPayer.value;
+
+      if (!payer) {
+        msg.textContent = '⚠️ 請選擇代墊付款人！';
+        isValid = false;
+      } else if (totalAmount <= 0) {
+        msg.textContent = '⚠️ 發票含稅總金額必須大於 0！';
+        isValid = false;
+      }
+
+      if (!isValid) {
+        DOM.btnSubmitExpense.disabled = true;
+        return false;
+      }
+
+      // 模式 1：平攤檢查
+      if (currentMode === 'equal') {
+        const checked = Array.from(DOM.equalCheckboxesContainer.querySelectorAll('input:checked'));
+        if (checked.length === 0) {
+          msg.textContent = '⚠️ 請至少勾選 1 位平攤成員！';
+          isValid = false;
+        } else {
+          const perPerson = Math.round((totalAmount / checked.length) * 100) / 100;
+          DOM.equalPerPersonTip.innerHTML = `
+            <span>每人應付 (${checked.length} 人)：</span>
+            <span class="font-bold text-indigo-700">NT$ ${perPerson.toLocaleString()}</span>
+          `;
+        }
+      }
+
+      // 模式 2：百分比檢查
+      else if (currentMode === 'percent') {
+        let sumPct = 0;
+        appState.members.forEach(m => {
+          sumPct += parseFloat(percentShares[m]) || 0;
+        });
+        const roundedPct = Math.round(sumPct * 100) / 100;
+        if (Math.abs(roundedPct - 100) > 0.05) {
+          DOM.percentSumBadge.textContent = `❌ 目前比例 ${roundedPct}% (需為 100%)`;
+          DOM.percentSumBadge.className = 'font-bold text-rose-600';
+          msg.textContent = `⚠️ 百分比總和目前為 ${roundedPct}%，必須等於 100%！`;
+          isValid = false;
+        } else {
+          DOM.percentSumBadge.textContent = `✅ 總和 100%`;
+          DOM.percentSumBadge.className = 'font-bold text-emerald-600';
+        }
+      }
+
+      // 模式 3：品項模式檢查
+      else if (currentMode === 'itemized') {
+        const fixedTax = parseFloat(DOM.inputFixedTax.value) || 0;
+        const targetPretax = Math.max(0, totalAmount - fixedTax);
+
+        if (itemizedList.length === 0) {
+          msg.textContent = '⚠️ 請至少新增 1 個餐點品項！';
+          isValid = false;
+        } else {
+          let sumPretax = 0;
+          for (let i = 0; i < itemizedList.length; i++) {
+            const item = itemizedList[i];
+            const p = parseFloat(item.price) || 0;
+            if (p <= 0) {
+              msg.textContent = `⚠️ 品項 #${i + 1} 請輸入大於 0 的金額！`;
+              isValid = false;
+              break;
+            }
+            if (item.consumers.length === 0) {
+              msg.textContent = `⚠️ 品項 #${i + 1} (${item.name}) 尚未指派承擔人！`;
+              isValid = false;
+              break;
+            }
+            sumPretax += p;
+          }
+
+          if (isValid) {
+            const diff = Math.round((targetPretax - sumPretax) * 100) / 100;
+            if (Math.abs(diff) > 0.05) {
+              msg.textContent = `⚠️ 品項合計 (NT$ ${sumPretax}) 與稅前目標 (NT$ ${targetPretax}) 差額 NT$ ${diff}，請校準！`;
+              isValid = false;
+            }
+          }
+        }
+      }
+
+      DOM.btnSubmitExpense.disabled = !isValid;
+      return isValid;
+    }
+
+    // --- STREAMING_CHUNK:Submitting transactions and building split records ---
+    function submitExpense() {
+      if (!validateCurrentForm()) return;
+
+      const newExpense = {
+        id: Date.now(),
+        mode: currentMode,
+        timestamp: new Date().toISOString()
+      };
+
+      // 處理麻將模式
+      if (currentMode === 'mahjong') {
+        const title = DOM.mahjongTitle.value.trim() || '麻將牌局結算';
+        const tableFee = parseFloat(DOM.mahjongTableFee.value) || 0;
+        const payer = DOM.mahjongFeePayer.value || appState.members[0];
+        const feeSplitType = document.querySelector('input[name="mahjong-fee-split"]:checked').value;
+
+        // 計算檯費分配
+        const feeSplits = {};
+        appState.members.forEach(m => feeSplits[m] = 0);
+
+        if (tableFee > 0 && feeSplitType !== 'none') {
+          if (feeSplitType === 'equal') {
+            const perPlayer = Math.round((tableFee / appState.members.length) * 100) / 100;
+            let remain = tableFee;
+            appState.members.forEach((m, idx) => {
+              if (idx === appState.members.length - 1) {
+                feeSplits[m] = Math.round(remain * 100) / 100;
+              } else {
+                feeSplits[m] = perPlayer;
+                remain -= perPlayer;
+              }
+            });
+          } else if (feeSplitType === 'winner') {
+            // 找出贏最多的人
+            let maxScore = -Infinity;
+            let winner = appState.members[0];
+            appState.members.forEach(m => {
+              const sc = parseFloat(mahjongScores[m]) || 0;
+              if (sc > maxScore) {
+                maxScore = sc;
+                winner = m;
+              }
+            });
+            feeSplits[winner] = tableFee;
+          }
+        }
+
+        // 合併輸贏與檯費
+        // 在標準 splits 結構中：splits[人] 代表該人需要「支付」的金額
+        // 輸錢的人 (score < 0) 應支付 abs(score)；贏錢的人 (score > 0) 應支付 -score (即應收)
+        const finalSplits = {};
+        appState.members.forEach(m => {
+          const score = parseFloat(mahjongScores[m]) || 0;
+          const tableShare = feeSplits[m] || 0;
+          // 淨支出 = (-輸贏) + 檯費分攤
+          finalSplits[m] = Math.round((-score + tableShare) * 100) / 100;
+        });
+
+        newExpense.title = title;
+        newExpense.payer = payer;
+        newExpense.amount = tableFee; // 實體代墊出資為檯費
+        newExpense.splits = finalSplits;
+        newExpense.meta = {
+          tableFee,
+          feeSplitType,
+          scores: { ...mahjongScores }
+        };
+
+        // 清空麻將分數
+        mahjongScores = {};
+        DOM.mahjongTableFee.value = '0';
+      }
+
+      // 處理一般模式 (equal, percent, itemized)
+      else {
+        const title = DOM.expenseTitle.value.trim() || '日常開銷';
+        const amount = parseFloat(DOM.inputTotalAmount.value);
+        const payer = DOM.selectPayer.value;
+        const splits = {};
+
+        if (currentMode === 'equal') {
+          const checked = Array.from(DOM.equalCheckboxesContainer.querySelectorAll('input:checked')).map(el => el.value);
+          const perPerson = Math.floor((amount / checked.length) * 100) / 100;
+          let runningTotal = 0;
+          checked.forEach((m, idx) => {
+            if (idx === checked.length - 1) {
+              splits[m] = Math.round((amount - runningTotal) * 100) / 100;
+            } else {
+              splits[m] = perPerson;
+              runningTotal += perPerson;
+            }
+          });
+          newExpense.meta = { checkedMembers: checked };
+        }
+
+        else if (currentMode === 'percent') {
+          let runningTotal = 0;
+          const validMembers = appState.members.filter(m => (parseFloat(percentShares[m]) || 0) > 0);
+          validMembers.forEach((m, idx) => {
+            if (idx === validMembers.length - 1) {
+              splits[m] = Math.round((amount - runningTotal) * 100) / 100;
+            } else {
+              const pct = parseFloat(percentShares[m]);
+              const calc = Math.round(amount * (pct / 100) * 100) / 100;
+              splits[m] = calc;
+              runningTotal += calc;
+            }
+          });
+          newExpense.meta = { percentShares: { ...percentShares } };
+          percentShares = {};
+        }
+
+        else if (currentMode === 'itemized') {
+          const fixedTax = parseFloat(DOM.inputFixedTax.value) || 0;
+          const pretaxTarget = Math.max(0, amount - fixedTax);
+
+          // 先計算每人品項未稅累積
+          const pretaxMemberTotals = {};
+          appState.members.forEach(m => pretaxMemberTotals[m] = 0);
+
+          itemizedList.forEach(item => {
+            const p = parseFloat(item.price) || 0;
+            const perHead = p / item.consumers.length;
+            item.consumers.forEach(m => {
+              pretaxMemberTotals[m] += perHead;
+            });
+          });
+
+          // 依未稅比例配賦固定稅額
+          let assignedTotal = 0;
+          const memberListWithPretax = appState.members.filter(m => pretaxMemberTotals[m] > 0);
+
+          memberListWithPretax.forEach((m, idx) => {
+            if (idx === memberListWithPretax.length - 1) {
+              splits[m] = Math.round((amount - assignedTotal) * 100) / 100;
+            } else {
+              const ratio = pretaxTarget > 0 ? (pretaxMemberTotals[m] / pretaxTarget) : (1 / memberListWithPretax.length);
+              const shareOfTax = fixedTax * ratio;
+              const personTotal = Math.round((pretaxMemberTotals[m] + shareOfTax) * 100) / 100;
+              splits[m] = personTotal;
+              assignedTotal += personTotal;
+            }
+          });
+
+          newExpense.meta = {
+            fixedTax,
+            pretaxTarget,
+            items: JSON.parse(JSON.stringify(itemizedList))
+          };
+          itemizedList = [];
+          DOM.inputFixedTax.value = '';
+        }
+
+        newExpense.title = title;
+        newExpense.amount = amount;
+        newExpense.payer = payer;
+        newExpense.splits = splits;
+
+        // 表單重置
+        DOM.expenseTitle.value = '';
+        DOM.inputTotalAmount.value = '';
+      }
+
+      appState.expenses.push(newExpense);
+      recordHistory();
+      renderAllViews();
+      showToast(`已成功記錄：${newExpense.title}`, '✅');
+    }
+
+    function deleteExpense(id) {
+      const exp = appState.expenses.find(e => e.id === id);
+      if (!exp) return;
+      if (!confirm(`確定要刪除「${exp.title}」這筆記錄嗎？`)) return;
+
+      appState.expenses = appState.expenses.filter(e => e.id !== id);
+      recordHistory();
+      renderAllViews();
+      showToast(`已刪除消費記錄`, '🗑️');
+    }
+
+    // --- STREAMING_CHUNK:Executing Greedy Settlement Algorithm for Net Balancing ---
+    function computeSettlement() {
+      const balances = {};
+      appState.members.forEach(m => balances[m] = 0);
+
+      appState.expenses.forEach(e => {
+        // 代墊人收回墊款
+        balances[e.payer] = (balances[e.payer] || 0) + e.amount;
+        // 分攤人承擔各自金額
+        if (e.splits) {
+          Object.entries(e.splits).forEach(([person, share]) => {
+            balances[person] = (balances[person] || 0) - share;
+          });
+        }
+      });
+
+      // 浮點精度校正至分位
+      Object.keys(balances).forEach(m => {
+        balances[m] = Math.round(balances[m] * 100) / 100;
+      });
+
+      const debtors = [];
+      const creditors = [];
+
+      Object.entries(balances).forEach(([name, bal]) => {
+        if (bal < -0.05) {
+          debtors.push({ name, amount: -bal });
+        } else if (bal > 0.05) {
+          creditors.push({ name, amount: bal });
+        }
+      });
+
+      // 貪婪匹配演算法 (Greedy Matching)：大額優先對沖相消
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      const transactions = [];
+      let i = 0, j = 0;
+
+      while (i < debtors.length && j < creditors.length) {
+        const debtor = debtors[i];
+        const creditor = creditors[j];
+        const amt = Math.min(debtor.amount, creditor.amount);
+
+        if (amt > 0.01) {
+          transactions.push({
+            from: debtor.name,
+            to: creditor.name,
+            amount: Math.round(amt * 100) / 100
+          });
+        }
+
+        debtor.amount -= amt;
+        creditor.amount -= amt;
+
+        if (debtor.amount <= 0.05) i++;
+        if (creditor.amount <= 0.05) j++;
+      }
+
+      return { balances, transactions };
+    }
+
+    // --- STREAMING_CHUNK:Rendering views and updating UI elements ---
+    function renderAllViews() {
+      renderMembersBadgeAndList();
+      renderPayerSelectOptions();
+      updateModeFormInputs();
+      renderExpenseRecordsList();
+      renderSettlementOverview();
+      validateCurrentForm();
+    }
+
+    function renderMembersBadgeAndList() {
+      DOM.memberCountBadge.textContent = `${appState.members.length} 人`;
+      DOM.membersList.innerHTML = '';
+
+      if (appState.members.length === 0) {
+        DOM.membersList.innerHTML = `
+          <div class="text-xs text-slate-400 py-2 w-full text-center">
+            目前無任何成員，請在上方輸入姓名新增
+          </div>`;
+        return;
+      }
+
+      appState.members.forEach(m => {
+        const tag = document.createElement('span');
+        tag.className = "inline-flex items-center gap-1.5 px-3 py-1 bg-white text-slate-700 rounded-full text-xs font-semibold border border-slate-200 shadow-2xs";
+        tag.innerHTML = `
+          <span>${m}</span>
+          <button type="button" onclick="removeMember('${m}')" class="text-slate-400 hover:text-rose-500 font-bold ml-0.5 leading-none" title="刪除此成員">&times;</button>
+        `;
+        DOM.membersList.appendChild(tag);
+      });
+    }
+
+    function renderPayerSelectOptions() {
+      const prevPayer = DOM.selectPayer.value;
+      const prevMahjongPayer = DOM.mahjongFeePayer.value;
+
+      const html = appState.members.map(m => `<option value="${m}">${m}</option>`).join('');
+      DOM.selectPayer.innerHTML = html;
+      DOM.mahjongFeePayer.innerHTML = html;
+
+      if (appState.members.includes(prevPayer)) DOM.selectPayer.value = prevPayer;
+      if (appState.members.includes(prevMahjongPayer)) DOM.mahjongFeePayer.value = prevMahjongPayer;
+    }
+
+    function renderExpenseRecordsList() {
+      DOM.recordCount.textContent = appState.expenses.length;
+      const total = appState.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      DOM.recordTotalAmount.textContent = `NT$ ${total.toLocaleString()}`;
+
+      DOM.expenseRecordsContainer.innerHTML = '';
+      if (appState.expenses.length === 0) {
+        DOM.expenseRecordsContainer.innerHTML = `
+          <div class="text-center py-12 text-slate-400 text-xs">
+            目前無任何消費記錄，請在左側輸入新增 ✨
+          </div>`;
+        return;
+      }
+
+      const modeBadges = {
+        equal: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">平攤</span>',
+        percent: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">百分比</span>',
+        itemized: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">品項反推</span>',
+        mahjong: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">🀄 麻將</span>'
+      };
+
+      appState.expenses.slice().reverse().forEach(exp => {
+        const item = document.createElement('div');
+        item.className = "p-3.5 bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-200 transition space-y-2";
+
+        const splitSummary = Object.entries(exp.splits || {})
+          .map(([p, amt]) => `${p}: ${amt >= 0 ? '$' + amt : '-$' + Math.abs(amt)}`)
+          .join(', ');
+
+        item.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-xs font-bold text-slate-900">${exp.title}</h3>
+                ${modeBadges[exp.mode] || ''}
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                代墊：<strong class="text-slate-700 font-semibold">${exp.payer}</strong>
+                ${exp.mode === 'mahjong' ? `(代墊檯費 NT$ ${exp.amount})` : `(出資 NT$ ${exp.amount.toLocaleString()})`}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-900">
+                NT$ ${(exp.amount || 0).toLocaleString()}
+              </span>
+              <button 
+                type="button" 
+                onclick="deleteExpense(${exp.id})" 
+                class="text-rose-500 hover:text-rose-700 text-xs font-semibold px-2 py-0.5 rounded hover:bg-rose-50 transition" 
+                title="刪除此筆記錄">
+                刪除
+              </button>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 truncate" title="${splitSummary}">
+            分派明細：${splitSummary}
+          </div>
+        `;
+        DOM.expenseRecordsContainer.appendChild(item);
+      });
+    }
+
+    function renderSettlementOverview() {
+      const { balances, transactions } = computeSettlement();
+
+      // 檢查總平帳驗算
+      let netSum = 0;
+      Object.values(balances).forEach(v => netSum += v);
+      DOM.settleSumCheck.textContent = `平衡差額: NT$ ${Math.round(netSum * 100) / 100}`;
+
+      // 渲染淨額
+      DOM.netBalanceList.innerHTML = '';
+      if (appState.members.length === 0) {
+        DOM.netBalanceList.innerHTML = `<div class="text-xs text-slate-400 text-center py-4">無成員資料</div>`;
+      } else {
+        Object.entries(balances).forEach(([name, bal]) => {
+          const row = document.createElement('div');
+          row.className = "flex justify-between items-center text-xs py-1 border-b border-slate-100 last:border-none";
+          const isZero = Math.abs(bal) <= 0.05;
+          const isPos = bal > 0.05;
+          const colorClass = isZero ? 'text-slate-400' : isPos ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+          const label = isZero ? '已平帳 ($0)' : isPos ? `應收 NT$ ${bal.toLocaleString()}` : `應付 NT$ ${Math.abs(bal).toLocaleString()}`;
+
+          row.innerHTML = `
+            <span class="text-slate-700 font-semibold">${name}</span>
+            <span class="${colorClass}">${label}</span>
+          `;
+          DOM.netBalanceList.appendChild(row);
+        });
+      }
+
+      // 渲染對沖轉帳建議
+      DOM.transferCountBadge.textContent = `${transactions.length} 筆轉帳`;
+      DOM.transferRoutesList.innerHTML = '';
+
+      if (transactions.length === 0) {
+        DOM.transferRoutesList.innerHTML = `
+          <div class="text-xs text-emerald-600 font-medium text-center py-4">
+            🎉 目前全體收支平衡，無需任何轉帳！
+          </div>`;
+      } else {
+        transactions.forEach(t => {
+          const card = document.createElement('div');
+          card.className = "flex items-center justify-between p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200 text-xs shadow-2xs";
+          card.innerHTML = `
+            <div class="flex items-center gap-1.5 font-semibold">
+              <span class="text-rose-600">${t.from}</span>
+              <span class="text-emerald-700">➡️</span>
+              <span class="text-emerald-700">${t.to}</span>
+            </div>
+            <span class="font-bold text-emerald-950 bg-white px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+              NT$ ${t.amount.toLocaleString()}
+            </span>
+          `;
+          DOM.transferRoutesList.appendChild(card);
+        });
+      }
+    }
+
+    // --- STREAMING_CHUNK:Generating formatted LINE report with fallback copy ---
+    function copyLineSettlementReport() {
+      const { balances, transactions } = computeSettlement();
+      if (appState.expenses.length === 0) {
+        showToast('目前尚無任何消費記錄可匯出！', '⚠️');
+        return;
+      }
+
+      const totalSpent = appState.expenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+      let text = `📢 【費用分攤達人 v1.2.0 - 結算報告】\n`;
+      text += `📅 結算時間：${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}\n`;
+      text += `💰 總計登記開銷：NT$ ${totalSpent.toLocaleString()} (${appState.expenses.length} 筆)\n\n`;
+
+      text += `--- 📊 個人收支淨額 ---\n`;
+      Object.entries(balances).forEach(([name, bal]) => {
+        if (bal > 0.05) text += `• ${name}：應收 NT$ ${bal.toLocaleString()}\n`;
+        else if (bal < -0.05) text += `• ${name}：應付 NT$ ${Math.abs(bal).toLocaleString()}\n`;
+        else text += `• ${name}：平帳 (NT$ 0)\n`;
+      });
+
+      text += `\n--- 🚀 最簡轉帳方案 (${transactions.length} 筆搞定) ---\n`;
+      if (transactions.length === 0) {
+        text += `完全平帳，大家都不用轉帳！🥳\n`;
+      } else {
+        transactions.forEach(t => {
+          text += `👉 ${t.from} 轉給 ${t.to}：NT$ ${t.amount.toLocaleString()}\n`;
+        });
+      }
+
+      text += `\n✨ 由「費用分攤達人」自動對沖結算`;
+
+      // 剪貼簿相容機制
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('已複製 LINE 報告至剪貼簿！', '📋');
+        }).catch(() => fallbackCopyText(text));
+      } else {
+        fallbackCopyText(text);
+      }
+    }
+
+    function fallbackCopyText(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('已複製 LINE 報告至剪貼簿！', '📋');
+      } catch (err) {
+        showToast('複製失敗，請手動選取', '❌');
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function showToast(message, icon = '✅') {
+      DOM.toastIcon.textContent = icon;
+      DOM.toastText.textContent = message;
+      DOM.toast.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+      setTimeout(() => {
+        DOM.toast.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+      }, 2400);
+    }
+
+    // --- STREAMING_CHUNK:Loading demo sample and binding global events ---
+    function loadSampleData() {
+      appState = {
+        members: ['小明', '阿強', '美美', '志豪'],
+        expenses: [
+          {
+            id: 101,
+            title: '第一天包車旅遊',
+            mode: 'equal',
+            payer: '小明',
+            amount: 3200,
+            splits: { '小明': 800, '阿強': 800, '美美': 800, '志豪': 800 },
+            meta: { checkedMembers: ['小明', '阿強', '美美', '志豪'] }
+          },
+          {
+            id: 102,
+            title: '義法海鮮餐酒館 (反推稅額)',
+            mode: 'itemized',
+            payer: '美美',
+            amount: 3300,
+            splits: { '小明': 1100, '阿強': 660, '美美': 880, '志豪': 660 },
+            meta: {
+              fixedTax: 300,
+              pretaxTarget: 3000,
+              items: [
+                { id: 1, name: '戰斧牛排', price: 1500, consumers: ['小明'] },
+                { id: 2, name: '海鮮燉飯', price: 900, consumers: ['阿強', '美美', '志豪'] },
+                { id: 3, name: '主廚甜點與飲品', price: 600, consumers: ['小明', '阿強', '美美', '志豪'] }
+              ]
+            }
+          },
+          {
+            id: 103,
+            title: '週日通宵麻將局 (包廂檯費400)',
+            mode: 'mahjong',
+            payer: '阿強',
+            amount: 400,
+            splits: { '小明': -700, '阿強': 400, '美美': 200, '志豪': 100 },
+            meta: {
+              tableFee: 400,
+              feeSplitType: 'equal',
+              scores: { '小明': 800, '阿強': -300, '美美': -100, '志豪': -400 }
+            }
+          }
+        ]
+      };
+      recordHistory();
+      renderAllViews();
+      showToast('已載入完整範例資料！', '🚀');
+    }
+
+    function resetAllData() {
+      if (!confirm('確定要清空所有人員名單與消費記錄嗎？')) return;
+      appState = {
+        members: [],
+        expenses: []
+      };
+      itemizedList = [];
+      percentShares = {};
+      mahjongScores = {};
+      recordHistory();
+      renderAllViews();
+      showToast('所有資料已重置清空', '🧹');
+    }
+
+    // --- STREAMING_CHUNK:Attaching event listeners and keyboard shortcuts ---
+    function initEventBindings() {
+      // 表單與成員監聽
+      DOM.formAddMember.addEventListener('submit', e => {
+        e.preventDefault();
+        addMember(DOM.inputMemberName.value);
+      });
+
+      // 模式 Tab 切換
+      DOM.tabs.equal.addEventListener('click', () => switchMode('equal'));
+      DOM.tabs.percent.addEventListener('click', () => switchMode('percent'));
+      DOM.tabs.itemized.addEventListener('click', () => switchMode('itemized'));
+      DOM.tabs.mahjong.addEventListener('click', () => switchMode('mahjong'));
+
+      // 金額與稅費動態輸入
+      DOM.inputTotalAmount.addEventListener('input', () => {
+        if (currentMode === 'itemized') updateTaxReverseCalculation();
+        validateCurrentForm();
+      });
+
+      DOM.inputFixedTax.addEventListener('input', () => {
+        updateTaxReverseCalculation();
+        validateCurrentForm();
+      });
+
+      DOM.selectPayer.addEventListener('change', () => validateCurrentForm());
+      DOM.expenseTitle.addEventListener('input', () => validateCurrentForm());
+
+      // 模式 1 快捷
+      DOM.btnEqualAll.addEventListener('click', () => {
+        DOM.equalCheckboxesContainer.querySelectorAll('input').forEach(i => i.checked = true);
+        validateCurrentForm();
+      });
+      DOM.btnEqualNone.addEventListener('click', () => {
+        DOM.equalCheckboxesContainer.querySelectorAll('input').forEach(i => i.checked = false);
+        validateCurrentForm();
+      });
+
+      // 模式 3 快捷
+      DOM.btnAddItemRow.addEventListener('click', () => addItemRow());
+      DOM.btnSyncTotalFromItems.addEventListener('click', () => syncTotalFromItems());
+
+      // 模式 4 麻將
+      DOM.mahjongTableFee.addEventListener('input', () => validateCurrentForm());
+      DOM.mahjongFeePayer.addEventListener('change', () => validateCurrentForm());
+      document.querySelectorAll('input[name="mahjong-fee-split"]').forEach(r => {
+        r.addEventListener('change', () => validateCurrentForm());
+      });
+
+      // 送出開銷按鈕
+      DOM.btnSubmitExpense.addEventListener('click', () => submitExpense());
+
+      // 歷史操作 Undo / Redo
+      DOM.btnUndo.addEventListener('click', undo);
+      DOM.btnRedo.addEventListener('click', redo);
+
+      // 全域鍵盤快捷鍵 (Ctrl+Z / Cmd+Z, Ctrl+Y / Cmd+Y)
+      window.addEventListener('keydown', e => {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+        if (ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          undo();
+        } else if ((ctrlKey && e.key.toLowerCase() === 'y') || (ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) {
+          e.preventDefault();
+          redo();
+        }
+      });
+
+      // 複製與範例工具
+      DOM.btnCopyLineReport.addEventListener('click', copyLineSettlementReport);
+      DOM.btnLoadDemo.addEventListener('click', loadSampleData);
+      DOM.btnResetAll.addEventListener('click', resetAllData);
+    }
+
+    // 應用程式初始化入口
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromLocalStorage();
+      initEventBindings();
+      renderAllViews();
+    });
+  </script>
+</body>
+</html>
